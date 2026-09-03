@@ -59,14 +59,11 @@ LOCATIONS = [
     "Chennai",
 ]
 
-EMPLOYMENT_STATUSES = [
-    "Active",
-    "Active",
-    "Active",
-    "Active",
-    "Leave",
-    "Inactive",
-]
+EMPLOYMENT_STATUSES = (
+    ["Active"] * 90
+    + ["Leave"] * 5
+    + ["Inactive"] * 5
+)
 
 
 # -----------------------------

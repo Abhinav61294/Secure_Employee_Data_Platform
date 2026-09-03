@@ -12,6 +12,9 @@ data/
 *.key
 *.pem
 
+# Generated data quality reports
+data_quality/reports/
+
 # IDE
 .vscode/
 .idea/
