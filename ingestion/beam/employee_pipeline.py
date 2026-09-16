@@ -1,21 +1,10 @@
+import argparse
 import csv
 import re
 from datetime import date
 
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
-
-
-# -----------------------------
-# Configuration
-# -----------------------------
-
-# Temporary test file containing duplicate records
-INPUT_FILE = "data/employees.csv"               # Switched from beam_test_duplicates.
-
-VALID_OUTPUT = "data/beam_output/valid_employees"
-INVALID_OUTPUT = "data/beam_output/invalid_employees"
-MASKED_OUTPUT = "data/beam_output/masked_employees"
 
 
 # -----------------------------
@@ -54,18 +43,21 @@ def is_valid_employee(record: dict) -> bool:
     email = record["email"]
     date_of_birth = record["date_of_birth"]
 
+    # Validate employee ID
     if not employee_id:
         return False
 
     if not employee_id.startswith("EMP"):
         return False
 
+    # Validate email
     if not re.match(
         r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
         email,
     ):
         return False
 
+    # Validate date of birth
     try:
         date.fromisoformat(date_of_birth)
     except ValueError:
@@ -141,11 +133,73 @@ def mask_pii(record: dict) -> dict:
 
 
 # -----------------------------
+# Transformation
+# -----------------------------
+
+def transform_record(record: dict) -> dict:
+    """Transform a masked employee record into an analytics-ready record."""
+
+    record = record.copy()
+
+    # Standardize text fields
+    record["department_id"] = (
+        record["department_id"].strip().upper()
+    )
+
+    record["employment_status"] = (
+        record["employment_status"].strip().title()
+    )
+
+    record["gender"] = (
+        record["gender"].strip().title()
+    )
+
+    record["location"] = (
+        record["location"].strip().title()
+    )
+
+    # Normalize date fields
+    record["date_of_birth"] = (
+        date.fromisoformat(
+            record["date_of_birth"]
+        ).isoformat()
+    )
+
+    record["hire_date"] = (
+        date.fromisoformat(
+            record["hire_date"]
+        ).isoformat()
+    )
+
+    # Calculate employment duration
+    hire_date = date.fromisoformat(
+        record["hire_date"]
+    )
+
+    reference_date = date.today()
+
+    employment_duration_years = (
+        reference_date.year
+        - hire_date.year
+        - (
+            (reference_date.month, reference_date.day)
+            < (hire_date.month, hire_date.day)
+        )
+    )
+
+    record["employment_duration_years"] = (
+        employment_duration_years
+    )
+
+    return record
+
+
+# -----------------------------
 # Output Formatting
 # -----------------------------
 
 def format_output(record: dict) -> str:
-    """Convert a dictionary back into a CSV row."""
+    """Convert a standard employee record into a CSV row."""
 
     return ",".join(
         [
@@ -165,15 +219,42 @@ def format_output(record: dict) -> str:
     )
 
 
+def format_transformed_output(record: dict) -> str:
+    """Convert a transformed employee record into a CSV row."""
+
+    return ",".join(
+        [
+            record["employee_id"],
+            record["first_name"],
+            record["last_name"],
+            record["email"],
+            record["phone"],
+            record["date_of_birth"],
+            record["gender"],
+            record["department_id"],
+            record["job_title"],
+            record["location"],
+            record["hire_date"],
+            record["employment_status"],
+            str(record["employment_duration_years"]),
+        ]
+    )
+
+
 # -----------------------------
 # Pipeline
 # -----------------------------
 
-def run() -> None:
+def run(
+    input_file: str,
+    masked_output: str,
+    invalid_output: str,
+    pipeline_args: list[str],
+) -> None:
     """Run the Apache Beam pipeline."""
 
     pipeline_options = PipelineOptions(
-        runner="DirectRunner"
+        pipeline_args
     )
 
     with beam.Pipeline(
@@ -187,7 +268,7 @@ def run() -> None:
         records = (
             pipeline
             | "Read CSV" >> beam.io.ReadFromText(
-                INPUT_FILE,
+                input_file,
                 skip_header_lines=1,
             )
             | "Parse CSV" >> beam.Map(parse_csv)
@@ -234,15 +315,30 @@ def run() -> None:
         )
 
         # -----------------------------
-        # Format outputs
+        # Transform records
         # -----------------------------
 
-        masked_output = (
+        transformed_records = (
             masked_records
-            | "Format Masked Records" >> beam.Map(
-                format_output
+            | "Transform Records" >> beam.Map(
+                transform_record
             )
         )
+
+        # -----------------------------
+        # Format transformed output
+        # -----------------------------
+
+        masked_output_records = (
+            transformed_records
+            | "Format Masked Records" >> beam.Map(
+                format_transformed_output
+            )
+        )
+
+        # -----------------------------
+        # Invalid records
+        # -----------------------------
 
         invalid_records = (
             records
@@ -258,13 +354,13 @@ def run() -> None:
         # Write outputs
         # -----------------------------
 
-        masked_output | "Write Masked Records" >> beam.io.WriteToText(
-            MASKED_OUTPUT,
+        masked_output_records | "Write Masked Records" >> beam.io.WriteToText(
+            masked_output,
             file_name_suffix=".csv",
         )
 
         invalid_records | "Write Invalid Records" >> beam.io.WriteToText(
-            INVALID_OUTPUT,
+            invalid_output,
             file_name_suffix=".csv",
         )
 
@@ -274,4 +370,38 @@ def run() -> None:
 # -----------------------------
 
 if __name__ == "__main__":
-    run()
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--input_file",
+        default=(
+            "gs://secure-employee-data-platform-data/"
+            "raw/hr/employees.csv"
+        ),
+    )
+
+    parser.add_argument(
+        "--masked_output",
+        default=(
+            "gs://secure-employee-data-platform-data/"
+            "processed/masked_employees"
+        ),
+    )
+
+    parser.add_argument(
+        "--invalid_output",
+        default=(
+            "gs://secure-employee-data-platform-data/"
+            "processed/invalid_employees"
+        ),
+    )
+
+    known_args, pipeline_args = parser.parse_known_args()
+
+    run(
+        input_file=known_args.input_file,
+        masked_output=known_args.masked_output,
+        invalid_output=known_args.invalid_output,
+        pipeline_args=pipeline_args,
+    )
