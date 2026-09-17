@@ -36,12 +36,12 @@ Analytics: Looker Studio
 DevOps: Terraform, Git, GitHub Actions
 
 🔄 Pipeline
-Ingestion — Employee, payroll, and compliance data are collected from CSV, PostgreSQL, and REST API sources.
-Processing — Apache Beam/Dataflow validates records, removes duplicates, masks PII, and transforms the data.
-Warehouse — Processed data is organized in BigQuery using layered data architecture.
-Transformation — Dataform builds curated analytical models and performs data quality assertions.
-Orchestration — Cloud Composer / Airflow coordinates Dataflow, BigQuery, and Dataform tasks.
-Analytics — Looker Studio provides interactive employee and salary analytics.
+Ingestion             — Employee, payroll, and compliance data are collected from CSV, PostgreSQL, and REST API sources.
+Processing            — Apache Beam/Dataflow validates records, removes duplicates, masks PII, and transforms the data.
+Warehouse             — Processed data is organized in BigQuery using layered data architecture.
+Transformation        — Dataform builds curated analytical models and performs data quality assertions.
+Orchestration         — Cloud Composer / Airflow coordinates Dataflow, BigQuery, and Dataform tasks.
+Analytics             — Looker Studio provides interactive employee and salary analytics.
 
 🔐 Security & Data Quality
 PII masking during data processing
@@ -62,15 +62,15 @@ Average salary by pay grade
 Interactive employment-status filtering
 
 📈 Validation
-Check	Result
-Input records	50,000
-Valid/masked records	49,000
-Invalid records	1,000
-Duplicate test	✅ Passed
-PII masking	✅ Verified
+Check	                        Result
+Input records	            50,000
+Valid/masked records	            49,000
+Invalid records	            1,000
+Duplicate test	            ✅ Passed
+PII masking	                        ✅ Verified
 Final integrated employees	49,684
-Airflow pipeline	✅ Successful
-GitHub Actions CI	✅ Passed
+Airflow pipeline	            ✅ Successful
+GitHub Actions CI	            ✅ Passed
 
 ☁️ Infrastructure & CI
 Terraform configuration is included for required GCP services, while GitHub Actions performs automated Python syntax and Terraform formatting checks.
